@@ -184,12 +184,13 @@ static void activate_waiting_tasks() {//aqui decrementamos los del numero de tic
     uint8_t index;
     for(index = 0; index < task_list.nTasks; index++)
     {
-        if(S_WAITING == task_list.tasks[task_list.current_task].state)
+        if(S_WAITING == task_list.tasks[index].state)
         {
-            task_list.tasks[task_list.current_task].local_tick--;
-            if(0 == task_list.tasks[task_list.current_task].local_tick)
+            task_list.tasks[index].local_tick--;
+            if(0 == task_list.tasks[index].local_tick)
             {
-                task_list.tasks[task_list.current_task].state = S_READY;
+                task_list.tasks[index].state = S_READY;
+                dispatcher(kFromNormalExec);
             }
         }
     }
@@ -201,7 +202,7 @@ static void activate_waiting_tasks() {//aqui decrementamos los del numero de tic
 
 static void idle_task(void) {
     for (;;) {
-
+        task_list.global_tick--;
     }
 }
 

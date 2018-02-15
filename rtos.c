@@ -27,7 +27,7 @@
 #define STACK_PSR_OFFSET            1
 #define STACK_PSR_DEFAULT           0x01000000
 
-#define RTOS_INVALID_TASK           0
+#define RTOS_INVALID_TASK           -1
 
 /**********************************************************************************/
 // IS ALIVE definitions
@@ -111,18 +111,22 @@ rtos_task_handle_t rtos_create_task(void (*task_body)(), uint8_t priority,
         task_list.tasks[task_list.nTasks].local_tick = 0;
         task_list.tasks[task_list.nTasks].task_body = task_body; //apuntador a la tarea. cuando se asigna, tiene la direccion de la tarea
         task_list.tasks[task_list.nTasks].sp =
-                &(task_list.tasks[task_list.nTasks].stack[RTOS_STACK_SIZE - 1 - STACK_FRAME_SIZE]);
-        task_list.tasks[task_list.nTasks].state = kStartSuspended == autostart ? S_SUSPENDED : S_READY;
-        task_list.tasks[task_list.nTasks].stack =
-                        &(task_list.tasks[task_list.nTasks].stack[RTOS_STACK_SIZE - STACK_PC_OFFSET]);
-        task_list.tasks[task_list.nTasks].sp =
-                        &(task_list.tasks[task_list.nTasks].stack[RTOS_STACK_SIZE - 1 - STACK_FRAME_SIZE]);//asigna los valores para el PSR
+                &(task_list.tasks[task_list.nTasks].stack[RTOS_STACK_SIZE - 1
+                        - STACK_FRAME_SIZE]); //asigna los valores para el PSR
+        task_list.tasks[task_list.nTasks].state =
+                kStartSuspended == autostart ? S_SUSPENDED : S_READY;
+        task_list.tasks[task_list.nTasks].stack[RTOS_STACK_SIZE
+                - STACK_PC_OFFSET] = (uint32_t) task_body;
+        task_list.tasks[task_list.nTasks].stack[RTOS_STACK_SIZE
+                - STACK_PSR_OFFSET] = STACK_PSR_DEFAULT;
+        retval = task_list.nTasks;
         task_list.nTasks++;
     }
+    return retval;
 }
 
 rtos_tick_t rtos_get_clock(void) {
-    return 0;
+    return task_list.global_tick;
 }
 
 void rtos_delay(rtos_tick_t ticks) {
@@ -132,7 +136,8 @@ void rtos_delay(rtos_tick_t ticks) {
 }
 
 void rtos_suspend_task(void) {
-
+    task_list.tasks[task_list.current_task].state = S_SUSPENDED;
+    dispatcher(kFromNormalExec);
 }
 
 void rtos_activate_task(rtos_task_handle_t task) {
@@ -168,21 +173,26 @@ static void dispatcher(task_switch_type_e type){ //busca cual es la de mas alta 
 }
 
 FORCE_INLINE static void context_switch(task_switch_type_e type) {
-    static uint8_t first = 1;
     register uint32_t *sp asm("sp");
-    if(first)
-    {
-        first = 0;
-        //task_list.current_task
-    }
-    task_list.tasks[task_list.current_task].sp = sp;//aquí puede que sea el -9
+    task_list.tasks[task_list.current_task].sp = sp-9;
     task_list.current_task = task_list.next_task;
     task_list.tasks[task_list.current_task].state = S_RUNNING;
     SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
 }
 
 static void activate_waiting_tasks() {//aqui decrementamos los del numero de ticks y cuando terminamos se activan las tareas lo del -9 que había puesto en iddle task (activate task)
-
+    uint8_t index;
+    for(index = 0; index < task_list.nTasks; index++)
+    {
+        if(S_WAITING == task_list.tasks[task_list.current_task].state)
+        {
+            task_list.tasks[task_list.current_task].local_tick--;
+            if(0 == task_list.tasks[task_list.current_task].local_tick)
+            {
+                task_list.tasks[task_list.current_task].state = S_READY;
+            }
+        }
+    }
 }
 
 /**********************************************************************************/
@@ -204,6 +214,7 @@ void SysTick_Handler(void) {
     refresh_is_alive();
 #endif
     task_list.global_tick++;
+    activate_waiting_tasks();
     dispatcher(kFromISR);
     reload_systick();
 }

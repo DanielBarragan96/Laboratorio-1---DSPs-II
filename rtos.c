@@ -89,6 +89,9 @@ static void idle_task(void);
 // API implementation
 /**********************************************************************************/
 
+/**********************************************************************************/
+// start scheduler, inicialización del sistema operativo
+/**********************************************************************************/
 void rtos_start_scheduler(void) {
 #ifdef RTOS_ENABLE_IS_ALIVE
 	init_is_alive();
@@ -103,6 +106,9 @@ void rtos_start_scheduler(void) {
 		;
 }
 
+/**********************************************************************************/
+// Creacion de tareas
+/**********************************************************************************/
 rtos_task_handle_t rtos_create_task(void (*task_body)(), uint8_t priority,
 		rtos_autostart_e autostart) {
 	rtos_task_handle_t retval = -1;
@@ -112,7 +118,7 @@ rtos_task_handle_t rtos_create_task(void (*task_body)(), uint8_t priority,
 		task_list.tasks[task_list.nTasks].task_body = task_body; //apuntador a la tarea. cuando se asigna, tiene la direccion de la tarea
 		task_list.tasks[task_list.nTasks].sp =
 				&(task_list.tasks[task_list.nTasks].stack[RTOS_STACK_SIZE - 1
-						- STACK_FRAME_SIZE]); //asigna los valores para el PSR
+						- STACK_FRAME_SIZE]);
 		task_list.tasks[task_list.nTasks].state =
 				kStartSuspended == autostart ? S_SUSPENDED : S_READY;
 		task_list.tasks[task_list.nTasks].stack[RTOS_STACK_SIZE
@@ -126,24 +132,35 @@ rtos_task_handle_t rtos_create_task(void (*task_body)(), uint8_t priority,
 	else return -1;
 }
 
-
+/**********************************************************************************/
+// Obtener valor de global tick
+/**********************************************************************************/
 rtos_tick_t rtos_get_clock(void) {
 	  return task_list.global_tick;
 }
 
+/**********************************************************************************/
+// Delay de la tarea, cambiar su estado a Waiting y llamar al dispatcher
+/**********************************************************************************/
 void rtos_delay(rtos_tick_t ticks) {
 	task_list.tasks[task_list.current_task].state = S_WAITING;
 	task_list.tasks[task_list.current_task].local_tick = ticks;
 	dispatcher( kFromNormalExec);
 }
 
+/**********************************************************************************/
+// Cambiar a estado suspendido y llamar al dispatcher
+/**********************************************************************************/
 void rtos_suspend_task(void) {
 	 task_list.tasks[task_list.current_task].state = S_SUSPENDED;
 	 dispatcher (kFromNormalExec);
 }
 
-void rtos_activate_task(rtos_task_handle_t task) {
-	task_list.tasks[task].state = S_READY;
+/**********************************************************************************/
+// Activar tarea y llamar al dispatcher ya sea por interrupcion o desde la tarea
+/**********************************************************************************/
+void rtos_activate_task() {
+	 task_list.tasks[task_list.current_task].state = S_READY;
 	dispatcher(kFromNormalExec);
 }
 
@@ -157,39 +174,53 @@ static void reload_systick(void) {
 	SysTick->VAL = 0;
 }
 
-static void dispatcher(task_switch_type_e type) { //busca cual es la de mas alta prioridad
-	rtos_task_handle_t next_task = RTOS_INVALID_TASK;
-	uint8_t index;
-	int8_t highest = -1;
-	for (index = 0; index < task_list.nTasks; index++) {
-		if (highest < task_list.tasks[index].priority
-				&& (S_READY == task_list.tasks[index].state
-						|| S_RUNNING == task_list.tasks[index].state)) {
-			highest = task_list.tasks[index].priority;
-			task_list.next_task = task_list.current_task;
-		}
+/**********************************************************************************/
+// Calendarizacion
+/**********************************************************************************/
+static void dispatcher(task_switch_type_e type) {//busca cual es la de mas alta prioridad
+    rtos_task_handle_t next_task = RTOS_INVALID_TASK;
+    uint8_t index;
+    int8_t highest = -1;
+    for (index = 0; index < task_list.nTasks; index++)
+    {
+        if (highest < task_list.tasks[index].priority
+                && (S_READY == task_list.tasks[index].state
+                        || S_RUNNING == task_list.tasks[index].state))
+        {
+            next_task = index;
+            highest = task_list.tasks[index].priority;
+        }
+    }
+
+    if (task_list.current_task != next_task)
+    {
+        task_list.next_task = next_task;
+        context_switch (type);
+    }
 	}
 
-	if (task_list.current_task != task_list.next_task) {
-		context_switch(kFromNormalExec);
-	}
-}
-
+/**********************************************************************************/
+// Cambio de contexto
+/**********************************************************************************/
 FORCE_INLINE static void context_switch(task_switch_type_e type) {
 	register uint32_t *sp asm("sp");
 	 if (kFromISR == type)
 	    {
 	        task_list.tasks[task_list.current_task].sp = sp - 9;
 	    }
-	    else if (kFromNormalExec == type)
+	    else if (kFromNormalExec == type  )
 	    {
 	        task_list.tasks[task_list.current_task].sp = sp - 9;
 	    }
-	task_list.current_task = task_list.next_task;
-	task_list.tasks[task_list.current_task].state = S_RUNNING;
+
+	 task_list.current_task = task_list.next_task;
+	task_list.tasks[task_list.next_task].state = S_RUNNING;
 	SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
 }
 
+/**********************************************************************************/
+// Activamos tareas que estaban en waiting
+/**********************************************************************************/
 static void activate_waiting_tasks() { //aqui decrementamos los del numero de ticks y cuando terminamos se activan las tareas lo del -9 que había puesto en iddle task (activate task)
 	//aqui decrementamos los del numero de ticks y cuando terminamos se activan las tareas lo del -9 que había puesto en iddle task (activate task)
 	    uint8_t index;
@@ -201,7 +232,7 @@ static void activate_waiting_tasks() { //aqui decrementamos los del numero de ti
 	            if (0 == task_list.tasks[index].local_tick)
 	            {
 	                task_list.tasks[index].state = S_READY;
-	                dispatcher (kFromNormalExec);
+	               // dispatcher (kFromISR);
 	            }
 	        }
 	    }
@@ -227,7 +258,7 @@ void SysTick_Handler(void) {
 	task_list.global_tick++;
 	activate_waiting_tasks ();
 	dispatcher(kFromISR);
-	reload_systick();
+	//reload_systick();
 }
 
 void PendSV_Handler(void) {

@@ -198,7 +198,14 @@ FORCE_INLINE static void context_switch (task_switch_type_e type)
     volatile static int first = 1;
     if(!first)
     {
-        task_list.tasks[task_list.current_task].sp = sp -9;
+        if(kFromISR == type)
+        {
+            task_list.tasks[task_list.current_task].sp = sp +9;
+        }
+        else
+        {
+            task_list.tasks[task_list.current_task].sp = sp -9;
+        }
     }
     else
     {

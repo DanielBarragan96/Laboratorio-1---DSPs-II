@@ -196,15 +196,15 @@ FORCE_INLINE static void context_switch (task_switch_type_e type)
 {
     register uint32_t *sp asm("sp");
     volatile static int first = 1;
-    if(!first)
+    if (!first)
     {
-        if(kFromISR == type)
+        if (kFromISR == type)
         {
-            task_list.tasks[task_list.current_task].sp = sp +9;
+            task_list.tasks[task_list.current_task].sp = sp + 9;
         }
         else
         {
-            task_list.tasks[task_list.current_task].sp = sp -9;
+            task_list.tasks[task_list.current_task].sp = sp - 9;
         }
     }
     else

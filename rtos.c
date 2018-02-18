@@ -195,13 +195,14 @@ static void dispatcher (task_switch_type_e type)
 FORCE_INLINE static void context_switch (task_switch_type_e type)
 {
     register uint32_t *sp asm("sp");
-    if (kFromISR == type)
+    volatile static int first = 1;
+    if(!first)
     {
-        task_list.tasks[task_list.current_task].sp = sp - 9;
+        task_list.tasks[task_list.current_task].sp = sp -9;
     }
-    else if (kFromNormalExec == type)
+    else
     {
-        task_list.tasks[task_list.current_task].sp = sp - 9;
+        first = 0;
     }
     task_list.current_task = task_list.next_task;
     task_list.tasks[task_list.current_task].state = S_RUNNING;

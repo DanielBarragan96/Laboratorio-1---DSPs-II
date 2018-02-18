@@ -220,7 +220,6 @@ static void activate_waiting_tasks ()
             if (0 == task_list.tasks[index].local_tick)
             {
                 task_list.tasks[index].state = S_READY;
-                dispatcher (kFromNormalExec);
             }
         }
     }

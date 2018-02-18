@@ -60,7 +60,7 @@ void rtos_suspend_task(void);
  * @param task handle of the task to be activated
  * @retval none
  */
-void rtos_activate_task(rtos_task_handle_t task);
+void rtos_activate_task(void);
 
 /*!
  * @brief Returns the rtos global tick

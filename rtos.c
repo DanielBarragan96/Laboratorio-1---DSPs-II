@@ -89,9 +89,13 @@ static void idle_task(void);
 // API implementation
 /**********************************************************************************/
 
-/**********************************************************************************/
-// start scheduler, inicialización del sistema operativo
-/**********************************************************************************/
+/*!
+ \brief	 This is the start scheduler, it starts the
+ operating system
+ Creates the idle task with priority 0
+ \param[in]  void.
+ \return void
+ */
 void rtos_start_scheduler(void) {
 #ifdef RTOS_ENABLE_IS_ALIVE
 	init_is_alive();
@@ -106,9 +110,12 @@ void rtos_start_scheduler(void) {
 		;
 }
 
-/**********************************************************************************/
-// Creacion de tareas
-/**********************************************************************************/
+/*!
+ \brief	 This is the create task function, it sets the priority,
+ tick, stack, state and task sp
+ \param[in]  (*task_body)(), uint8_t priority, rtos_autostart_e autostart
+ \return rtos_task_handle_t
+ */
 rtos_task_handle_t rtos_create_task(void (*task_body)(), uint8_t priority,
 		rtos_autostart_e autostart) {
 	rtos_task_handle_t retval = -1;
@@ -132,51 +139,63 @@ rtos_task_handle_t rtos_create_task(void (*task_body)(), uint8_t priority,
 		return -1;
 }
 
-/**********************************************************************************/
-// Obtener valor de global tick
-/**********************************************************************************/
+/*!
+ \brief	 get global tick value
+ \param[in]  void
+ \return rtos_tick_t
+ */
 rtos_tick_t rtos_get_clock(void) {
 	return task_list.global_tick;
 }
 
-/**********************************************************************************/
-// Delay de la tarea, cambiar su estado a Waiting y llamar al dispatcher
-/**********************************************************************************/
+/*!
+ \brief	 task delay, sets task.state to waiting and sets local tick value
+ \param[in]  rtos_tick_t
+ \return void
+ */
 void rtos_delay(rtos_tick_t ticks) {
 	task_list.tasks[task_list.current_task].state = S_WAITING;
 	task_list.tasks[task_list.current_task].local_tick = ticks;
 	dispatcher(kFromNormalExec);
 }
 
-/**********************************************************************************/
-// Cambiar a estado suspendido y llamar al dispatcher
-/**********************************************************************************/
+/*!
+ \brief	 sets task.state to suspend
+ \param[in]  void
+ \return void
+ */
 void rtos_suspend_task(void) {
 	task_list.tasks[task_list.current_task].state = S_SUSPENDED;
 	dispatcher(kFromNormalExec);
 }
 
-/**********************************************************************************/
-// Activar tarea y llamar al dispatcher ya sea por interrupcion o desde la tarea
-/**********************************************************************************/
+/*!
+ \brief	 sets task.state to ready
+ \param[in]  void
+ \return void
+ */
 void rtos_activate_task() {
 	task_list.tasks[task_list.current_task].state = S_READY;
 	dispatcher(kFromNormalExec);
 }
 
-/**********************************************************************************/
-// Local methods implementation
-/**********************************************************************************/
-
+/*!
+ \brief	 local methods implementation
+ \param[in]  void
+ \return void
+ */
 static void reload_systick(void) {
 	SysTick->LOAD = USEC_TO_COUNT(RTOS_TIC_PERIOD_IN_US,
 			CLOCK_GetCoreSysClkFreq());
 	SysTick->VAL = 0;
 }
 
-/**********************************************************************************/
-// Calendarizacion
-/**********************************************************************************/
+/*!
+ \brief	 its the scheduling function, detects the highest priority task
+ sets the next task
+ \param[in]  task_switch_type_e
+ \return void
+ */
 static void dispatcher(task_switch_type_e type) { //busca cual es la de mas alta prioridad
 	rtos_task_handle_t next_task = RTOS_INVALID_TASK;
 	uint8_t index;
@@ -190,15 +209,18 @@ static void dispatcher(task_switch_type_e type) { //busca cual es la de mas alta
 		}
 	}
 
-	if (next_task != task_list.current_task ) {
+	if (next_task != task_list.current_task) {
 		task_list.next_task = next_task;
 		context_switch(type);
 	}
 }
 
-/**********************************************************************************/
-// Cambio de contexto
-/**********************************************************************************/
+/*!
+ \brief	 context switch with different offsets for the ISR context switch
+ and the direct task context switch
+ \param[in]  task_switch_type_e
+ \return void
+ */
 FORCE_INLINE static void context_switch(task_switch_type_e type) {
 	register uint32_t *sp asm("sp");
 	if (kFromISR == type) {
@@ -213,9 +235,11 @@ FORCE_INLINE static void context_switch(task_switch_type_e type) {
 	SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
 }
 
-/**********************************************************************************/
-// Activamos tareas que estaban en waiting
-/**********************************************************************************/
+/*!
+ \brief	 activate waiting tasks after decreasing localtick
+ \param[in]  void
+ \return void
+ */
 static void activate_waiting_tasks() { //aqui decrementamos los del numero de ticks y cuando terminamos se activan las tareas lo del -9 que había puesto en iddle task (activate task)
 	//aqui decrementamos los del numero de ticks y cuando terminamos se activan las tareas lo del -9 que había puesto en iddle task (activate task)
 	uint8_t index;
@@ -224,16 +248,16 @@ static void activate_waiting_tasks() { //aqui decrementamos los del numero de ti
 			task_list.tasks[index].local_tick--;
 			if (0 == task_list.tasks[index].local_tick) {
 				task_list.tasks[index].state = S_READY;
-				// dispatcher (kFromISR);
 			}
 		}
 	}
 }
 
-/**********************************************************************************/
-// IDLE TASK
-/**********************************************************************************/
-
+/*!
+ \brief	idle task
+ \param[in]  void
+ \return void
+ */
 static void idle_task(void) {
 	for (;;) {
 	}
@@ -250,7 +274,6 @@ void SysTick_Handler(void) {
 	task_list.global_tick++;
 	activate_waiting_tasks();
 	dispatcher(kFromISR);
-	//reload_systick();
 }
 
 void PendSV_Handler(void) {

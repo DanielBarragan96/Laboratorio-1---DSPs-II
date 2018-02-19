@@ -21,12 +21,12 @@
 // Module defines
 /**********************************************************************************/
 
-#define FORCE_INLINE    __attribute__((always_inline)) inline
+#define FORCE_INLINE 	__attribute__((always_inline)) inline
 
-#define STACK_FRAME_SIZE            8
-#define STACK_PC_OFFSET             2
-#define STACK_PSR_OFFSET            1
-#define STACK_PSR_DEFAULT           0x01000000
+#define STACK_FRAME_SIZE			8
+#define STACK_PC_OFFSET				2
+#define STACK_PSR_OFFSET			1
+#define STACK_PSR_DEFAULT			0x01000000
 
 #define RTOS_INVALID_TASK           -1
 
@@ -46,7 +46,6 @@ static void refresh_is_alive (void);
 /**********************************************************************************/
 // Type definitions
 /**********************************************************************************/
-
 typedef enum
 {
     S_READY = 0, S_RUNNING, S_WAITING, S_SUSPENDED
@@ -70,7 +69,6 @@ typedef struct
 /**********************************************************************************/
 // Global (static) task list
 /**********************************************************************************/
-
 struct
 {
     uint8_t nTasks;
@@ -293,6 +291,7 @@ void PendSV_Handler (void)
     SCB->ICSR |= SCB_ICSR_PENDSTCLR_Msk;
     r0 = task_list.tasks[task_list.current_task].sp;
     asm("mov r7, r0");
+
 }
 
 /**********************************************************************************/
@@ -300,6 +299,7 @@ void PendSV_Handler (void)
 /**********************************************************************************/
 
 #ifdef RTOS_ENABLE_IS_ALIVE
+
 static void init_is_alive (void)
 {
     gpio_pin_config_t gpio_config =

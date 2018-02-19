@@ -95,6 +95,9 @@ static void idle_task (void);
 // API implementation
 /**********************************************************************************/
 
+/**********************************************************************************/
+// start scheduler, inicialización del sistema operativo
+/**********************************************************************************/
 void rtos_start_scheduler (void)
 {
 #ifdef RTOS_ENABLE_IS_ALIVE
@@ -110,6 +113,10 @@ void rtos_start_scheduler (void)
         ;
 }
 
+
+/**********************************************************************************/
+// Creacion de tareas
+/**********************************************************************************/
 rtos_task_handle_t rtos_create_task (void (*task_body) (), uint8_t priority,
         rtos_autostart_e autostart)
 {
@@ -134,11 +141,17 @@ rtos_task_handle_t rtos_create_task (void (*task_body) (), uint8_t priority,
     return retval;
 }
 
+/**********************************************************************************/
+// Obtener valor de global tick
+/**********************************************************************************/
 rtos_tick_t rtos_get_clock (void)
 {
     return task_list.global_tick;
 }
 
+/**********************************************************************************/
+// Delay de la tarea, cambiar su estado a Waiting y llamar al dispatcher
+/**********************************************************************************/
 void rtos_delay (rtos_tick_t ticks)
 {
     task_list.tasks[task_list.current_task].state = S_WAITING;
@@ -146,12 +159,18 @@ void rtos_delay (rtos_tick_t ticks)
     dispatcher (kFromNormalExec);
 }
 
+/**********************************************************************************/
+// Cambiar a estado suspendido y llamar al dispatcher
+/**********************************************************************************/
 void rtos_suspend_task (void)
 {
     task_list.tasks[task_list.current_task].state = S_SUSPENDED;
     dispatcher (kFromNormalExec);
 }
 
+/**********************************************************************************/
+// Activar tarea y llamar al dispatcher ya sea por interrupcion o desde la tarea
+/**********************************************************************************/
 void rtos_activate_task (rtos_task_handle_t task)
 {
     task_list.tasks[task].state = S_READY;
@@ -169,6 +188,9 @@ static void reload_systick (void)
     SysTick->VAL = 0;
 }
 
+/**********************************************************************************/
+// Calendarizacion
+/**********************************************************************************/
 static void dispatcher (task_switch_type_e type)
 { //busca cual es la de mas alta prioridad
     rtos_task_handle_t next_task = RTOS_INVALID_TASK;
@@ -192,6 +214,9 @@ static void dispatcher (task_switch_type_e type)
     }
 }
 
+/**********************************************************************************/
+// Cambio de contexto
+/**********************************************************************************/
 FORCE_INLINE static void context_switch (task_switch_type_e type)
 {
     register uint32_t *sp asm("sp");
@@ -216,6 +241,9 @@ FORCE_INLINE static void context_switch (task_switch_type_e type)
     SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
 }
 
+/**********************************************************************************/
+// Activamos tareas que estaban en waiting
+/**********************************************************************************/
 static void activate_waiting_tasks ()
 { //aqui decrementamos los del numero de ticks y cuando terminamos se activan las tareas lo del -9 que había puesto en iddle task (activate task)
     uint8_t index;

@@ -62,8 +62,8 @@ typedef struct
     uint32_t *sp;
     void (*task_body) ();
     rtos_tick_t local_tick;
-    uint32_t reserved[10];
-    uint32_t stack[RTOS_STACK_SIZE];
+    uint32_t stack[RTOS_STACK_SIZE + 10];
+    //para evitar que el printf cambie los otros aspectos de la estructura
 } rtos_tcb_t;
 
 /**********************************************************************************/
